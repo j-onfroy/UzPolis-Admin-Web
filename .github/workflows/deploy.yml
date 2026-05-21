@@ -1,0 +1,50 @@
+name: UzPolis Admin UI — CI/CD
+
+on:
+  push:
+    branches:
+      - prod
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/uzpolis-admin-ui
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Kodni o'qib olish
+        uses: actions/checkout@v3
+
+      - name: 2. GHCR ga ulanish
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 3. Docker imaj yaratish va GHCR ga yuklash
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: 4. Serverda frontendni yangilash
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          script: |
+            cd /home/ubuntu/uzpolis-admin
+            export GITHUB_OWNER=${{ github.repository_owner }}
+            echo "${{ secrets.GITHUB_TOKEN }}" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            sudo docker-compose pull uzpolis-admin-ui
+            sudo docker-compose up -d uzpolis-admin-ui
+            sudo docker image prune -a -f
