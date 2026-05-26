@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { api, getErrorMessage } from '@/lib/api';
 import { setAuth } from '@/lib/auth';
+import { handlePhoneInput, normalizePhone } from '@/lib/utils';
 
 type Step = 'credentials' | 'otp' | 'verify-identity';
 
@@ -53,7 +54,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data: res } = await api.post<LoginRes>('/auth/login', { phone, password });
+      const { data: res } = await api.post<LoginRes>('/auth/login', { phone: normalizePhone(phone), password });
       setStepToken(res.step_token);
       setPhoneMasked(res.phone_masked);
       toast.success('SMS kod yuborildi');
@@ -156,11 +157,12 @@ export default function LoginPage() {
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="+998901234567"
+                    placeholder="+998 90 123 45 67"
                     value={phone}
-                    onChange={e => setPhone(e.target.value)}
+                    onChange={e => setPhone(handlePhoneInput(e.target.value))}
                     required
                     autoFocus
+                    maxLength={13}
                   />
                 </div>
                 <div className="space-y-2">

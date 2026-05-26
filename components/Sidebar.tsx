@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, History, DollarSign, Wallet,
   TrendingUp, ShieldCheck, LogOut, ChevronDown, ChevronRight,
-  FileText, Car, Calculator, UserCheck, Settings, KeyRound
+  FileText, Car, Calculator, UserCheck, Settings, KeyRound, Clock
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,7 @@ const navItems: NavItem[] = [
   { label: 'Hamyonlar', href: '/wallets', icon: <Wallet size={18} /> },
   { label: 'Sotuvlar', href: '/sales', icon: <TrendingUp size={18} /> },
   { label: "Sug'urta Sotish", href: '/osago-sell', icon: <ShieldCheck size={18} /> },
+  { label: "Jarayondagi To'lovlar", href: '/pending-payments', icon: <Clock size={18} /> },
   { label: 'Rollar', href: '/roles', icon: <KeyRound size={18} /> },
   { label: 'Sozlamalar', href: '/settings', icon: <Settings size={18} /> },
 ];

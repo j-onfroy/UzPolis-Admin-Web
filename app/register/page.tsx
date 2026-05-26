@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { api, getErrorMessage } from '@/lib/api';
+import { handlePhoneInput, normalizePhone } from '@/lib/utils';
 
 type Step = 'phone' | 'otp' | 'passport';
 
@@ -44,7 +45,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/admin-onboarding/request-otp', { phoneNumber: phone });
+      await api.post('/admin-onboarding/request-otp', { phoneNumber: normalizePhone(phone) });
       toast.success('SMS kod yuborildi');
       setStep('otp');
     } catch (err) {
@@ -76,7 +77,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await api.post('/admin-onboarding/complete', {
-        phoneNumber: phone,
+        phoneNumber: normalizePhone(phone),
         otp,
         passportSeries,
         passportNumber,
@@ -144,11 +145,12 @@ export default function RegisterPage() {
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="+998901234567"
+                    placeholder="+998 90 123 45 67"
                     value={phone}
-                    onChange={e => setPhone(e.target.value)}
+                    onChange={e => setPhone(handlePhoneInput(e.target.value))}
                     required
                     autoFocus
+                    maxLength={13}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>

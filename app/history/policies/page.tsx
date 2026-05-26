@@ -37,7 +37,7 @@ export default function HistoryPoliciesPage() {
   }
 
   const columns = [
-    { key: 'id', label: 'ID', render: (r: PolicyHistoryDto) => <span className="font-mono text-xs text-muted-foreground">#{r.id}</span> },
+    { key: 'id', label: 'ID', render: (r: PolicyHistoryDto) => <span className="font-mono text-xs text-muted-foreground">{r.id}</span> },
     { key: 'gosNumber', label: 'Davlat raqami', render: (r: PolicyHistoryDto) => <span className="font-mono font-semibold">{r.gosNumber}</span> },
     { key: 'clientPhone', label: 'Mijoz', render: (r: PolicyHistoryDto) => r.clientPhone },
     {
@@ -45,7 +45,12 @@ export default function HistoryPoliciesPage() {
       render: (r: PolicyHistoryDto) => <Badge className={statusVariant(r.status)}>{r.status}</Badge>
     },
     { key: 'amountUzs', label: 'Summa', render: (r: PolicyHistoryDto) => new Intl.NumberFormat('uz-UZ').format(r.amountUzs) + ' so\'m' },
-    { key: 'sellerAdminName', label: 'Admin', render: (r: PolicyHistoryDto) => r.sellerAdminName || '—' },
+    {
+      key: 'sellerAdminName', label: 'Ro\'yxatlashtirildi',
+      render: (r: PolicyHistoryDto) => r.sellerAdminName
+        ? <span className="font-medium">{r.sellerAdminName}</span>
+        : <span className="text-muted-foreground italic text-xs">Web sayt orqali</span>
+    },
     { key: 'createdAt', label: 'Sana', render: (r: PolicyHistoryDto) => format(new Date(r.createdAt), 'dd.MM.yyyy HH:mm') },
   ];
 

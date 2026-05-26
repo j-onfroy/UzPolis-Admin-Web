@@ -62,7 +62,7 @@ export default function SalesPage() {
   ];
 
   const mySalesColumns = [
-    { key: 'id', label: 'ID', render: (r: SaleDto) => <span className="font-mono text-xs text-muted-foreground">#{r.id}</span> },
+    { key: 'id', label: 'ID', render: (r: SaleDto) => <span className="font-mono text-xs text-muted-foreground">{r.id}</span> },
     { key: 'gosNumber', label: 'Davlat raqami', render: (r: SaleDto) => <span className="font-mono font-semibold">{r.gosNumber}</span> },
     { key: 'clientPhone', label: 'Mijoz', render: (r: SaleDto) => r.clientPhone || '—' },
     { key: 'amountUzs', label: 'Summa', render: (r: SaleDto) => fmt(r.amountUzs) },

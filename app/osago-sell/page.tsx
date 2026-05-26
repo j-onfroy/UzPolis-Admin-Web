@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import DashboardLayout from '@/components/DashboardLayout';
 import PageHeader from '@/components/PageHeader';
@@ -9,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api, getErrorMessage } from '@/lib/api';
+import { handlePhoneInput, normalizePhone } from '@/lib/utils';
 import { Car, User, MessageSquare, CheckCircle, Clock, ShieldCheck, Wallet, TrendingUp, Plus, Trash2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 
 type Step = 'calculate' | 'owner' | 'sms' | 'payment' | 'confirm';
@@ -69,8 +71,8 @@ interface PendingSale {
 }
 
 const PERIODS = [
-  { id: 1, label: '6 oy' },
-  { id: 2, label: '12 oy' },
+  { id: 1, label: '12 oy' },
+  { id: 2, label: '6 oy' },
 ];
 
 const STEPS: { key: Step; label: string }[] = [
@@ -111,7 +113,6 @@ export default function SugurtaSotishPage() {
   // Step 2: owner passport (individual) + drivers
   const [ownerPassSeriya, setOwnerPassSeriya] = useState('');
   const [ownerPassNumber, setOwnerPassNumber] = useState('');
-  const [ownerBirthDate, setOwnerBirthDate] = useState('');
   const [drivers, setDrivers] = useState<Driver[]>([]);
 
   // Step 3: SMS + contract
@@ -126,7 +127,6 @@ export default function SugurtaSotishPage() {
 
   // Pending sales
   const [pendingSales, setPendingSales] = useState<PendingSale[]>([]);
-  const [checkingId, setCheckingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<number>('/cashback/my-rate')
@@ -197,7 +197,7 @@ export default function SugurtaSotishPage() {
   }
 
   function ownerStepValid() {
-    const indivOk = !isOrg && ownerPassSeriya.length >= 2 && ownerPassNumber.length >= 7 && !!ownerBirthDate;
+    const indivOk = !isOrg && ownerPassSeriya.length >= 2 && ownerPassNumber.length >= 7;
     const baseOk = isOrg || indivOk;
     if (!baseOk) return false;
     return drivers.every(d => d.passSeriya.length >= 2 && d.passNumber.length >= 7 && !!d.birthDate);
@@ -207,7 +207,7 @@ export default function SugurtaSotishPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/osago/sms/send', { phoneNumber });
+      await api.post('/osago/sms/send', { phoneNumber: normalizePhone(phoneNumber) });
       setSmsSent(true);
       toast.success('SMS yuborildi');
     } catch (err) { toast.error(getErrorMessage(err)); }
@@ -219,7 +219,7 @@ export default function SugurtaSotishPage() {
     setLoading(true);
     try {
       const { data } = await api.post<{ identity?: string }>('/osago/sms/verify', {
-        phoneNumber,
+        phoneNumber: normalizePhone(phoneNumber),
         code: smsCode,
       });
       await createContract(data?.identity || '');
@@ -246,7 +246,7 @@ export default function SugurtaSotishPage() {
       const ownerDriver = {
         passSeriya: ownerPassSeriya.toUpperCase(),
         passNumber: ownerPassNumber,
-        birthDate: ownerBirthDate,
+        ...(calcResult?.owner?.pinfl ? { pinfl: calcResult.owner.pinfl } : {}),
       };
       const extraDrivers = drivers.map(d => ({
         passSeriya: d.passSeriya.toUpperCase(),
@@ -260,7 +260,7 @@ export default function SugurtaSotishPage() {
       calculationId: calcResult?.id,
       identity,
       startDate,
-      phoneNumber,
+      phoneNumber: normalizePhone(phoneNumber),
       limited: isLimited,
       applicant: applicantPayload,
       owner: ownerPayload,
@@ -288,20 +288,6 @@ export default function SugurtaSotishPage() {
     finally { setConfirming(false); }
   }
 
-  async function checkPendingPayment(contractId: string) {
-    setCheckingId(contractId);
-    try {
-      const { data } = await api.post<ContractResult>(`/osago/pending-sales/${contractId}/check`, {});
-      if (data.status === 'PAID') {
-        toast.success("To'lov tasdiqlandi! Cashback hamyoningizga tushdi.");
-        loadPendingSales();
-      } else {
-        toast.info("To'lov hali amalga oshmagan. Mijoz to'lovni bajarmagan.");
-      }
-    } catch (err) { toast.error(getErrorMessage(err)); }
-    finally { setCheckingId(null); }
-  }
-
   function reset() {
     loadPendingSales();
     setStep('calculate');
@@ -309,7 +295,6 @@ export default function SugurtaSotishPage() {
     setCalcResult(null);
     setOwnerPassSeriya('');
     setOwnerPassNumber('');
-    setOwnerBirthDate('');
     setDrivers([]);
     setPhoneNumber('');
     setStartDate(todayStr());
@@ -388,12 +373,30 @@ export default function SugurtaSotishPage() {
                     ))}
                   </div>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={calcForm.limited}
-                    onChange={e => setCalcForm(f => ({ ...f, limited: e.target.checked }))}
-                    className="w-4 h-4 accent-primary" />
-                  <span className="text-sm">Cheklangan haydovchilar (limited)</span>
-                </label>
+                <div className="space-y-2">
+                  <Label>Haydovchilar turi</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button"
+                      onClick={() => setCalcForm(f => ({ ...f, limited: false }))}
+                      className={`py-2.5 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                        !calcForm.limited ? 'bg-primary text-white border-primary' : 'border-border hover:border-primary bg-background'
+                      }`}>
+                      Cheklanmagan
+                    </button>
+                    <button type="button"
+                      onClick={() => setCalcForm(f => ({ ...f, limited: true }))}
+                      className={`py-2.5 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                        calcForm.limited ? 'bg-primary text-white border-primary' : 'border-border hover:border-primary bg-background'
+                      }`}>
+                      Cheklangan
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {calcForm.limited
+                      ? 'Faqat ko\'rsatilgan haydovchilar haydashi mumkin'
+                      : 'Istalgan haydovchi haydashi mumkin'}
+                  </p>
+                </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Hisoblanmoqda...' : 'Hisoblash'}
                 </Button>
@@ -447,12 +450,11 @@ export default function SugurtaSotishPage() {
                         onChange={e => setOwnerPassNumber(e.target.value.replace(/\D/g, ''))} required />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Tug&apos;ilgan sana</Label>
-                    <Input type="date" value={ownerBirthDate}
-                      onChange={e => setOwnerBirthDate(e.target.value)} required
-                      max={new Date().toISOString().split('T')[0]} />
-                  </div>
+                  {calcResult?.owner?.pinfl && (
+                    <p className="text-xs text-muted-foreground bg-muted/40 rounded p-2">
+                      PINFL: <span className="font-mono font-medium">{calcResult.owner.pinfl}</span> — tug&apos;ilgan sana avtomatik aniqlanadi
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -546,8 +548,9 @@ export default function SugurtaSotishPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Mijoz telefon raqami</Label>
-                  <Input placeholder="+998901234567" value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)} required />
+                  <Input placeholder="+998 90 123 45 67" value={phoneNumber}
+                    onChange={e => setPhoneNumber(handlePhoneInput(e.target.value))}
+                    maxLength={13} required />
                 </div>
 
                 {!smsSent ? (
@@ -713,58 +716,25 @@ export default function SugurtaSotishPage() {
           </div>
         )}
 
-        {/* Pending sales — always visible on calculate step */}
+        {/* Pending sales — summary with link to full page */}
         {step === 'calculate' && pendingSales.length > 0 && (
           <div className="mt-8">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle size={16} className="text-amber-500" />
-              <h3 className="text-sm font-semibold">Jarayondagi to&apos;lovlar ({pendingSales.length})</h3>
-              <button onClick={loadPendingSales} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
-                <RefreshCw size={14} />
-              </button>
-            </div>
-            <div className="space-y-3">
-              {pendingSales.map(sale => (
-                <Card key={sale.id} className="border-amber-200 bg-amber-50/50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-sm space-y-0.5">
-                        <p className="font-mono font-semibold">{sale.gosNumber || '—'}</p>
-                        <p className="text-muted-foreground">{sale.clientPhone || '—'}</p>
-                        <p className="font-medium text-primary">{fmt(sale.amountUzs)}</p>
-                        {sale.cashbackAmount && sale.cashbackAmount > 0 && (
-                          <p className="text-xs text-emerald-600">Cashback: {fmt(sale.cashbackAmount)}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          {sale.createdAt ? new Date(sale.createdAt).toLocaleString('uz-UZ') : ''}
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 flex-shrink-0">
-                        {sale.paymeUrl && (
-                          <a href={sale.paymeUrl} target="_blank" rel="noreferrer">
-                            <Button size="sm" className="bg-[#00A4D6] hover:bg-[#0090bc] text-white gap-1 h-7 text-xs w-full">
-                              <ExternalLink size={11} />Payme
-                            </Button>
-                          </a>
-                        )}
-                        {sale.clickUrl && (
-                          <a href={sale.clickUrl} target="_blank" rel="noreferrer">
-                            <Button size="sm" className="bg-[#1B2A47] hover:bg-[#152038] text-white gap-1 h-7 text-xs w-full">
-                              <ExternalLink size={11} />Click
-                            </Button>
-                          </a>
-                        )}
-                        <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
-                          disabled={checkingId === sale.contractId}
-                          onClick={() => sale.contractId && checkPendingPayment(sale.contractId)}>
-                          <RefreshCw size={11} />
-                          {checkingId === sale.contractId ? 'Tekshirilmoqda...' : "To'lovni tekshirish"}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="flex items-center gap-2 p-4 rounded-xl border border-amber-200 bg-amber-50/60">
+              <AlertCircle size={18} className="text-amber-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">
+                  {pendingSales.length} ta to&apos;lov kutilmoqda
+                </p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Mijozlar to&apos;lovni hali amalga oshirmagan
+                </p>
+              </div>
+              <Link href="/pending-payments">
+                <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100 gap-1.5 flex-shrink-0">
+                  <ExternalLink size={13} />
+                  Ko&apos;rish
+                </Button>
+              </Link>
             </div>
           </div>
         )}
