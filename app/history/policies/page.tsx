@@ -58,13 +58,14 @@ export default function HistoryPoliciesPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [listRes, sumRes] = await Promise.all([
-        api.get<PageResult<PolicyHistoryDto>>('/history/policies', { params: { ...search, page, size: 20 } }),
-        api.get<PolicySummaryDto>('/history/policies/summary', { params: { ...search } }),
-      ]);
-      setData(listRes.data);
-      setSummary(sumRes.data);
+      const { data: listRes } = await api.get<PageResult<PolicyHistoryDto>>('/history/policies', { params: { ...search, page, size: 20 } });
+      setData(listRes);
     } catch { } finally { setLoading(false); }
+
+    // Summary alohida — u xato bersa ham asosiy ro'yxat ko'rinishda qoladi
+    api.get<PolicySummaryDto>('/history/policies/summary', { params: { ...search } })
+      .then(r => setSummary(r.data))
+      .catch(() => setSummary(null));
   }
 
   async function checkPayment(contractId: string) {
