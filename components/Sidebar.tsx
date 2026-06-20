@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Foydalanuvchilar', href: '/history/users', icon: <UserCheck size={16} /> },
       { label: 'Polislar', href: '/history/policies', icon: <FileText size={16} /> },
+      { label: 'Sotilgan polislar', href: '/history/sales', icon: <TrendingUp size={16} /> },
       { label: 'Kalkulyatsiyalar', href: '/history/calculations', icon: <Calculator size={16} /> },
       { label: 'Avtomobillar', href: '/history/vehicles', icon: <Car size={16} /> },
       { label: 'Admin amallar', href: '/history/admins', icon: <ShieldCheck size={16} /> },

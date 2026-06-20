@@ -39,17 +39,42 @@ export interface PolicyHistoryDto {
   contractId?: string;
   gosNumber: string;
   ownerName?: string;
+  markaName?: string;
+  modelName?: string;
   clientPhone?: string;
   status: string;
   amountUzs: number;
   policySery?: string;
   policyNumber?: string;
   policyFileUrl?: string;
+  failureReason?: string;
   periodId?: number;
   limited?: boolean;
   sellerAdminName?: string;
   startDate?: string;
   createdAt: string;
+}
+
+export interface PolicySummaryDto {
+  count: number;
+  totalAmount: number;
+}
+
+export interface SoldPolicyDto {
+  id: number;
+  contractId?: string;
+  gosNumber?: string;
+  clientPhone?: string;
+  amountUzs: number;
+  createdAt: string;
+  paidAt?: string;
+  policySery?: string;
+  policyNumber?: string;
+  sellerType: 'ADMIN' | 'WEB';
+  adminName?: string;
+  adminCashbackRate?: number;
+  adminCashbackAmount?: number;
+  userCashbackAmount?: number;
 }
 
 export interface CalculationHistoryDto {
