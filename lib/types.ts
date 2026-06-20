@@ -36,11 +36,15 @@ export interface UserHistoryDto {
 
 export interface PolicyHistoryDto {
   id: number;
+  contractId?: string;
   gosNumber: string;
+  ownerName?: string;
   clientPhone?: string;
   status: string;
   amountUzs: number;
+  policySery?: string;
   policyNumber?: string;
+  policyFileUrl?: string;
   periodId?: number;
   limited?: boolean;
   sellerAdminName?: string;
