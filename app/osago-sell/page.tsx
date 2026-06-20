@@ -10,10 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api, getErrorMessage } from '@/lib/api';
-import { handlePhoneInput, normalizePhone } from '@/lib/utils';
-import { Car, User, MessageSquare, CheckCircle, Clock, ShieldCheck, Wallet, TrendingUp, Plus, Trash2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { handlePhoneInput, normalizePhone, isValidPhone, handleGovNumberInput, isValidGovNumber, handlePassportSeria, handleTechSeria, handleDigits } from '@/lib/utils';
+import { Car, User, FileText, CheckCircle, Clock, ShieldCheck, Wallet, TrendingUp, Plus, Trash2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type Step = 'calculate' | 'owner' | 'sms' | 'payment' | 'confirm';
+type Step = 'calculate' | 'owner' | 'details' | 'payment' | 'confirm';
 
 interface AdminMe {
   id?: number;
@@ -40,10 +41,25 @@ interface CalcResult {
   [key: string]: unknown;
 }
 
+const RELATION_DEGREES = [
+  { value: 0, label: 'Qarindosh emas' },
+  { value: 1, label: 'Otasi' },
+  { value: 2, label: 'Katta akasi' },
+  { value: 3, label: 'Kichik akasi' },
+  { value: 4, label: 'Xotini' },
+  { value: 5, label: 'Onasi' },
+  { value: 6, label: 'Eri' },
+  { value: 7, label: "O'g'li" },
+  { value: 8, label: 'Qizi' },
+  { value: 9, label: 'Katta opasi' },
+  { value: 10, label: 'Kichik singlisi' },
+];
+
 interface Driver {
   passSeriya: string;
   passNumber: string;
   birthDate: string;
+  relative: number;
 }
 
 interface ContractResult {
@@ -78,7 +94,7 @@ const PERIODS = [
 const STEPS: { key: Step; label: string }[] = [
   { key: 'calculate', label: 'Hisoblash' },
   { key: 'owner', label: 'Egasi' },
-  { key: 'sms', label: 'SMS' },
+  { key: 'details', label: 'Shartnoma' },
   { key: 'payment', label: "To'lov" },
   { key: 'confirm', label: 'Tayyor' },
 ];
@@ -92,7 +108,7 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
-const EMPTY_DRIVER: Driver = { passSeriya: '', passNumber: '', birthDate: '' };
+const EMPTY_DRIVER: Driver = { passSeriya: '', passNumber: '', birthDate: '', relative: 0 };
 
 export default function SugurtaSotishPage() {
   const [step, setStep] = useState<Step>('calculate');
@@ -113,13 +129,12 @@ export default function SugurtaSotishPage() {
   // Step 2: owner passport (individual) + drivers
   const [ownerPassSeriya, setOwnerPassSeriya] = useState('');
   const [ownerPassNumber, setOwnerPassNumber] = useState('');
+  const [ownerIsDriver, setOwnerIsDriver] = useState(true);
   const [drivers, setDrivers] = useState<Driver[]>([]);
 
-  // Step 3: SMS + contract
+  // Step 3: contract details
   const [phoneNumber, setPhoneNumber] = useState('');
   const [startDate, setStartDate] = useState(todayStr());
-  const [smsSent, setSmsSent] = useState(false);
-  const [smsCode, setSmsCode] = useState('');
 
   // Step 4-5: contract + payment
   const [contract, setContract] = useState<ContractResult | null>(null);
@@ -175,6 +190,7 @@ export default function SugurtaSotishPage() {
       }
 
       // drivers state holds only extra drivers added by user
+      setOwnerIsDriver(true);
       setDrivers([]);
 
       setStep('owner');
@@ -192,83 +208,64 @@ export default function SugurtaSotishPage() {
     setDrivers(d => d.filter((_, i) => i !== idx));
   }
 
-  function updateDriver(idx: number, field: keyof Driver, value: string) {
+  function updateDriver(idx: number, field: keyof Driver, value: string | number) {
     setDrivers(d => d.map((dr, i) => i === idx ? { ...dr, [field]: value } : dr));
   }
 
   function ownerStepValid() {
-    const indivOk = !isOrg && ownerPassSeriya.length >= 2 && ownerPassNumber.length >= 7;
+    const indivOk = !isOrg && ownerPassSeriya.length === 2 && ownerPassNumber.length === 7;
     const baseOk = isOrg || indivOk;
     if (!baseOk) return false;
-    return drivers.every(d => d.passSeriya.length >= 2 && d.passNumber.length >= 7 && !!d.birthDate);
+    // Cheklangan (limited) uchun kamida bitta haydovchi bo'lishi shart:
+    // yo egasi haydovchi, yo qo'shimcha haydovchi qo'shilgan bo'lsin.
+    if (isLimited && !isOrg && !ownerIsDriver && drivers.length === 0) return false;
+    return drivers.every(d => d.passSeriya.length === 2 && d.passNumber.length === 7 && !!d.birthDate);
   }
 
-  async function handleSendSms(e: React.FormEvent) {
+  async function handleCreateContract(e: React.FormEvent) {
     e.preventDefault();
+    if (!isValidPhone(phoneNumber)) { toast.error("Telefon raqamini to'g'ri kiriting (+998XXXXXXXXX)"); return; }
     setLoading(true);
     try {
-      await api.post('/osago/sms/send', { phoneNumber: normalizePhone(phoneNumber) });
-      setSmsSent(true);
-      toast.success('SMS yuborildi');
-    } catch (err) { toast.error(getErrorMessage(err)); }
-    finally { setLoading(false); }
-  }
+      const ownerPayload = isOrg
+        ? { organization: { inn: calcResult?.ownerInn || calcResult?.owner?.inn || '' } }
+        : { person: { passSeriya: ownerPassSeriya.toUpperCase(), passNumber: ownerPassNumber } };
 
-  async function handleVerifySms(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const { data } = await api.post<{ identity?: string }>('/osago/sms/verify', {
-        phoneNumber: normalizePhone(phoneNumber),
-        code: smsCode,
-      });
-      await createContract(data?.identity || '');
-    } catch (err) { toast.error(getErrorMessage(err)); }
-    finally { setLoading(false); }
-  }
-
-  async function createContract(identity: string) {
-    const ownerPayload = isOrg
-      ? { organization: { inn: calcResult?.ownerInn || calcResult?.owner?.inn || '' } }
-      : { person: { passSeriya: ownerPassSeriya.toUpperCase(), passNumber: ownerPassNumber } };
-
-    // applicant = admin (always) — send pinfl if available, otherwise birthDate
-    const applicantPayload = {
-      passSeriya: adminMe?.passportSeries || '',
-      passNumber: adminMe?.passportNumber || '',
-      ...(adminMe?.pinfl ? { pinfl: adminMe.pinfl } : {}),
-      ...(adminMe?.birthdate ? { birthDate: adminMe.birthdate.split('T')[0] } : {}),
-    };
-
-    // drivers: org → empty; individual → owner as first + extra drivers added by user
-    let driversPayload: object[] = [];
-    if (!isOrg) {
-      const ownerDriver = {
-        passSeriya: ownerPassSeriya.toUpperCase(),
-        passNumber: ownerPassNumber,
-        ...(calcResult?.owner?.pinfl ? { pinfl: calcResult.owner.pinfl } : {}),
+      // applicant = admin (always) — send pinfl if available, otherwise birthDate
+      const applicantPayload = {
+        passSeriya: adminMe?.passportSeries || '',
+        passNumber: adminMe?.passportNumber || '',
+        ...(adminMe?.pinfl ? { pinfl: adminMe.pinfl } : {}),
+        ...(adminMe?.birthdate ? { birthDate: adminMe.birthdate.split('T')[0] } : {}),
       };
-      const extraDrivers = drivers.map(d => ({
-        passSeriya: d.passSeriya.toUpperCase(),
-        passNumber: d.passNumber,
-        birthDate: d.birthDate,
-      }));
-      driversPayload = [ownerDriver, ...extraDrivers];
-    }
 
-    const { data } = await api.post<ContractResult>('/osago/contract', {
-      calculationId: calcResult?.id,
-      identity,
-      startDate,
-      phoneNumber: normalizePhone(phoneNumber),
-      limited: isLimited,
-      applicant: applicantPayload,
-      owner: ownerPayload,
-      drivers: driversPayload,
-    });
-    setContract(data);
-    setStep('payment');
-    toast.success('Shartnoma yaratildi!');
+      // Egasi haydovchi sifatida backend tomonidan isOwnerDriver orqali qo'shiladi.
+      // Bu yerda faqat qo'shimcha haydovchilarni yuboramiz (org uchun bo'sh).
+      const driversPayload: object[] = (!isOrg && isLimited)
+        ? drivers.map(d => ({
+            passSeriya: d.passSeriya.toUpperCase(),
+            passNumber: d.passNumber,
+            birthDate: d.birthDate,
+            relative: d.relative ?? 0,
+          }))
+        : [];
+
+      const { data } = await api.post<ContractResult>('/osago/contract', {
+        calculationId: calcResult?.id,
+        startDate,
+        phoneNumber: normalizePhone(phoneNumber),
+        gosNumber: calcResult?.gosNumber || calcForm.gosNumber,
+        limited: isLimited,
+        isOwnerDriver: !isOrg && isLimited ? ownerIsDriver : false,
+        applicant: applicantPayload,
+        owner: ownerPayload,
+        drivers: driversPayload,
+      });
+      setContract(data);
+      setStep('payment');
+      toast.success('Shartnoma yaratildi!');
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setLoading(false); }
   }
 
   async function handleConfirmPayment() {
@@ -295,11 +292,10 @@ export default function SugurtaSotishPage() {
     setCalcResult(null);
     setOwnerPassSeriya('');
     setOwnerPassNumber('');
+    setOwnerIsDriver(true);
     setDrivers([]);
     setPhoneNumber('');
     setStartDate(todayStr());
-    setSmsSent(false);
-    setSmsCode('');
     setContract(null);
   }
 
@@ -345,19 +341,22 @@ export default function SugurtaSotishPage() {
               <form onSubmit={handleCalculate} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Davlat raqami</Label>
-                  <Input placeholder="01B618XC" value={calcForm.gosNumber}
-                    onChange={e => setCalcForm(f => ({ ...f, gosNumber: e.target.value.toUpperCase() }))} required />
+                  <Input placeholder="01B618XC" value={calcForm.gosNumber} maxLength={8} inputMode="text"
+                    onChange={e => setCalcForm(f => ({ ...f, gosNumber: handleGovNumberInput(e.target.value) }))} required />
+                  {calcForm.gosNumber.length > 0 && !isValidGovNumber(calcForm.gosNumber) && (
+                    <p className="text-xs text-destructive">Davlat raqami 8 ta belgidan iborat bo&apos;lishi kerak (mas: 01B618XC)</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tex pasport seriya</Label>
-                    <Input placeholder="AAG" value={calcForm.techSery}
-                      onChange={e => setCalcForm(f => ({ ...f, techSery: e.target.value.toUpperCase() }))} required />
+                    <Input placeholder="AAG" value={calcForm.techSery} maxLength={3}
+                      onChange={e => setCalcForm(f => ({ ...f, techSery: handleTechSeria(e.target.value) }))} required />
                   </div>
                   <div className="space-y-2">
                     <Label>Tex pasport raqam</Label>
-                    <Input placeholder="7029457" value={calcForm.techNumber}
-                      onChange={e => setCalcForm(f => ({ ...f, techNumber: e.target.value }))} required />
+                    <Input placeholder="7029457" value={calcForm.techNumber} maxLength={7} inputMode="numeric"
+                      onChange={e => setCalcForm(f => ({ ...f, techNumber: handleDigits(e.target.value, 7) }))} required />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -397,7 +396,7 @@ export default function SugurtaSotishPage() {
                       : 'Istalgan haydovchi haydashi mumkin'}
                   </p>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || !isValidGovNumber(calcForm.gosNumber) || calcForm.techSery.length < 3 || calcForm.techNumber.length < 1}>
                   {loading ? 'Hisoblanmoqda...' : 'Hisoblash'}
                 </Button>
               </form>
@@ -421,7 +420,7 @@ export default function SugurtaSotishPage() {
                     <p className="font-mono font-semibold">{calcResult.gosNumber || calcForm.gosNumber}</p>
                     <p className="text-muted-foreground">{calcResult.markaName} {calcResult.modelName}</p>
                     {isOrg && <Badge variant="secondary" className="mt-1">Tashkilot</Badge>}
-                    {isLimited && <Badge variant="secondary" className="mt-1 ml-1">Limited</Badge>}
+                    {isLimited && <Badge variant="secondary" className="mt-1 ml-1">Cheklangan</Badge>}
                   </div>
                 </div>
                 {cashbackAmount > 0 && (
@@ -441,13 +440,13 @@ export default function SugurtaSotishPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Pasport seriya</Label>
-                      <Input placeholder="AA" maxLength={2} value={ownerPassSeriya}
-                        onChange={e => setOwnerPassSeriya(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} required />
+                      <Input placeholder="AD" maxLength={2} value={ownerPassSeriya}
+                        onChange={e => setOwnerPassSeriya(handlePassportSeria(e.target.value))} required />
                     </div>
                     <div className="space-y-2">
                       <Label>Pasport raqam</Label>
-                      <Input placeholder="1234567" maxLength={7} value={ownerPassNumber}
-                        onChange={e => setOwnerPassNumber(e.target.value.replace(/\D/g, ''))} required />
+                      <Input placeholder="1234567" maxLength={7} inputMode="numeric" value={ownerPassNumber}
+                        onChange={e => setOwnerPassNumber(handleDigits(e.target.value, 7))} required />
                     </div>
                   </div>
                   {calcResult?.owner?.pinfl && (
@@ -484,33 +483,62 @@ export default function SugurtaSotishPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-xs text-muted-foreground bg-muted/40 rounded p-2">
-                    Egasi avtomatik birinchi haydovchi sifatida qo&apos;shiladi
-                  </p>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Egasini haydovchilar ro&apos;yxatiga qo&apos;shilsinmi?</Label>
+                    <Select value={ownerIsDriver ? 'yes' : 'no'} onValueChange={v => setOwnerIsDriver(v === 'yes')}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Ha</SelectItem>
+                        <SelectItem value="no">Yo&apos;q</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {ownerIsDriver
+                        ? 'Egasi birinchi haydovchi sifatida qo’shiladi'
+                        : 'Egasi haydovchilar ro’yxatiga qo’shilmaydi — kamida bitta haydovchi qo’shing'}
+                    </p>
+                  </div>
                   {drivers.map((driver, idx) => (
                     <div key={idx} className="p-3 rounded-lg border border-border space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">{idx + 2}-haydovchi</span>
+                        <span className="text-xs font-medium text-muted-foreground">{idx + (ownerIsDriver ? 2 : 1)}-haydovchi</span>
                         <button type="button" onClick={() => removeDriver(idx)}
                           className="text-destructive hover:text-destructive/70 transition-colors">
                           <Trash2 size={14} />
                         </button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <Label className="text-xs">Seriya</Label>
-                          <Input placeholder="AA" maxLength={2} value={driver.passSeriya}
-                            onChange={e => updateDriver(idx, 'passSeriya', e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} />
+                          <Input placeholder="AD" maxLength={2} value={driver.passSeriya}
+                            onChange={e => updateDriver(idx, 'passSeriya', handlePassportSeria(e.target.value))} />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Raqam</Label>
-                          <Input placeholder="1234567" maxLength={7} value={driver.passNumber}
-                            onChange={e => updateDriver(idx, 'passNumber', e.target.value.replace(/\D/g, ''))} />
+                          <Input placeholder="1234567" maxLength={7} inputMode="numeric" value={driver.passNumber}
+                            onChange={e => updateDriver(idx, 'passNumber', handleDigits(e.target.value, 7))} />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Tug&apos;ilgan sana</Label>
                           <Input type="date" value={driver.birthDate}
                             onChange={e => updateDriver(idx, 'birthDate', e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Qarindoshlik darajasi</Label>
+                          <Select value={String(driver.relative)} onValueChange={v => updateDriver(idx, 'relative', Number(v))}>
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {RELATION_DEGREES.map(r => (
+                                <SelectItem key={r.value} value={String(r.value)} className="text-xs">
+                                  {r.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
@@ -521,15 +549,15 @@ export default function SugurtaSotishPage() {
 
             <div className="flex gap-3">
               <Button type="button" variant="outline" onClick={() => setStep('calculate')}>Orqaga</Button>
-              <Button className="flex-1" disabled={!ownerStepValid()} onClick={() => setStep('sms')}>
+              <Button className="flex-1" disabled={!ownerStepValid()} onClick={() => setStep('details')}>
                 Davom etish
               </Button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: SMS + contract creation */}
-        {step === 'sms' && (
+        {/* STEP 3: Contract details + creation */}
+        {step === 'details' && (
           <div className="space-y-4">
             <Card className="bg-primary/5 border-primary/20">
               <CardContent className="p-4 flex items-center justify-between text-sm">
@@ -539,46 +567,28 @@ export default function SugurtaSotishPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MessageSquare size={16} />Shartnoma tasdiqlash</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText size={16} />Shartnoma ma&apos;lumotlari</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Boshlanish sanasi</Label>
-                  <Input type="date" value={startDate}
-                    onChange={e => setStartDate(e.target.value)} min={todayStr()} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mijoz telefon raqami</Label>
-                  <Input placeholder="+998 90 123 45 67" value={phoneNumber}
-                    onChange={e => setPhoneNumber(handlePhoneInput(e.target.value))}
-                    maxLength={13} required />
-                </div>
+                <form onSubmit={handleCreateContract} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Boshlanish sanasi</Label>
+                    <Input type="date" value={startDate}
+                      onChange={e => setStartDate(e.target.value)} min={todayStr()} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mijoz telefon raqami</Label>
+                    <Input placeholder="+998901234567" value={phoneNumber} type="tel" inputMode="numeric"
+                      onChange={e => setPhoneNumber(handlePhoneInput(e.target.value))}
+                      maxLength={13} required />
+                    {phoneNumber.length > 0 && !isValidPhone(phoneNumber) && (
+                      <p className="text-xs text-destructive">Telefon raqami +998XXXXXXXXX ko&apos;rinishida bo&apos;lishi kerak</p>
+                    )}
+                  </div>
 
-                {!smsSent ? (
-                  <form onSubmit={handleSendSms}>
-                    <Button type="submit" className="w-full" disabled={loading || !phoneNumber}>
-                      {loading ? 'Yuborilmoqda...' : 'SMS yuborish'}
-                    </Button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifySms} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>SMS kod</Label>
-                      <Input placeholder="1234" maxLength={6} value={smsCode}
-                        onChange={e => setSmsCode(e.target.value.replace(/\D/g, ''))}
-                        className="text-center text-2xl tracking-[0.4em] font-mono h-12" autoFocus />
-                      <p className="text-xs text-muted-foreground text-center">{phoneNumber} raqamiga yuborildi</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <Button type="button" size="sm" variant="outline" className="gap-1"
-                        onClick={() => { setSmsSent(false); setSmsCode(''); }}>
-                        <RefreshCw size={13} /> Qayta
-                      </Button>
-                      <Button type="submit" className="flex-1" disabled={loading || smsCode.length < 4}>
-                        {loading ? 'Yaratilmoqda...' : 'Tasdiqlash va polis yaratish'}
-                      </Button>
-                    </div>
-                  </form>
-                )}
+                  <Button type="submit" className="w-full" disabled={loading || !isValidPhone(phoneNumber) || !startDate}>
+                    {loading ? 'Yaratilmoqda...' : 'Polis yaratish'}
+                  </Button>
+                </form>
 
                 <Button type="button" variant="ghost" size="sm" className="w-full text-muted-foreground"
                   onClick={() => setStep('owner')}>

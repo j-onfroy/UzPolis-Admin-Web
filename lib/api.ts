@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://agent.uzpolis.uz/admin-api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8090/admin-api';
 
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];

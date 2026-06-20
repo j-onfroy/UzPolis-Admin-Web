@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { api, getErrorMessage } from '@/lib/api';
 import { getUser } from '@/lib/auth';
+import { handlePhoneInput, normalizePhone, isValidPhone } from '@/lib/utils';
 import { UserPlus, ShieldAlert, MessageSquare, Trash2 } from 'lucide-react';
 
 interface AdminRow {
@@ -56,11 +57,12 @@ export default function AdminsPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (!isValidPhone(form.phoneNumber)) { toast.error("Telefon raqamini to'g'ri kiriting (+998XXXXXXXXX)"); return; }
     setSaving(true);
     try {
       await api.post('/admins', {
         fullName: form.fullName,
-        phoneNumber: form.phoneNumber,
+        phoneNumber: normalizePhone(form.phoneNumber),
         roleId: Number(form.roleId),
       });
       toast.success(`${form.fullName} qo'shildi. SMS parol yuborildi.`);
@@ -250,9 +252,11 @@ export default function AdminsPage() {
               <Label>Telefon raqam</Label>
               <Input
                 type="tel"
+                inputMode="numeric"
+                maxLength={13}
                 placeholder="+998901234567"
                 value={form.phoneNumber}
-                onChange={e => setForm(f => ({ ...f, phoneNumber: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, phoneNumber: handlePhoneInput(e.target.value) }))}
                 required
               />
             </div>
