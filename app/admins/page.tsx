@@ -178,7 +178,7 @@ export default function AdminsPage() {
       key: 'verified', label: 'Tasdiqlangan',
       render: (r: AdminRow) => r.verified
         ? <span className="text-green-600 text-xs font-medium">✓ Ha</span>
-        : <span className="text-amber-600 text-xs font-medium">⌛ Yo'q</span>
+        : <span className="text-amber-600 text-xs font-medium">⌛ Yo&apos;q</span>
     },
     {
       key: 'actions', label: '',
@@ -222,7 +222,7 @@ export default function AdminsPage() {
         action={
           <Button onClick={() => setAddOpen(true)} size="sm" className="gap-2">
             <UserPlus size={16} />
-            Admin qo'shish
+            Admin qo&apos;shish
           </Button>
         }
       />
@@ -232,9 +232,9 @@ export default function AdminsPage() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Yangi admin qo'shish</DialogTitle>
+            <DialogTitle>Yangi admin qo&apos;shish</DialogTitle>
             <DialogDescription>
-              Admin qo'shilgach uning telefoniga parol va kirish ma'lumotlari SMS orqali yuboriladi.
+              Admin qo&apos;shilgach uning telefoniga parol va kirish ma&apos;lumotlari SMS orqali yuboriladi.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 pt-2">
@@ -296,7 +296,7 @@ export default function AdminsPage() {
           <DialogHeader>
             <DialogTitle className="text-destructive flex items-center gap-2">
               <Trash2 size={18} />
-              Adminni o'chirish
+              Adminni o&apos;chirish
             </DialogTitle>
           </DialogHeader>
 
@@ -304,7 +304,7 @@ export default function AdminsPage() {
             <div className="space-y-3 py-2">
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{deleteTarget?.fullName}</span> ni
-                o'chirmoqchisiz. Telegram kanaliga tasdiqlash kodi yuborilmoqda...
+                o&apos;chirmoqchisiz. Telegram kanaliga tasdiqlash kodi yuborilmoqda...
               </p>
               {deleteLoading && (
                 <p className="text-xs text-muted-foreground animate-pulse">Kod yuborilmoqda...</p>
@@ -314,7 +314,7 @@ export default function AdminsPage() {
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
                 Telegram kanalga yuborilgan <span className="font-semibold">6 raqamli kodni</span> yoki{' '}
-                <span className="font-mono font-semibold">delete</span> so'zini kiriting.
+                <span className="font-mono font-semibold">delete</span> so&apos;zini kiriting.
               </p>
               <Input
                 placeholder="Kod yoki 'delete'"
