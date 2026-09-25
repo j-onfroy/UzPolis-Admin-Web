@@ -40,11 +40,11 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/ubuntu/uzpolis-admin
             export GITHUB_OWNER=${{ github.repository_owner }}
-            echo "${{ secrets.GITHUB_TOKEN }}" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            sudo docker-compose pull uzpolis-admin-ui
-            sudo docker-compose up -d uzpolis-admin-ui
-            sudo docker image prune -a -f
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull uzpolis-admin-ui
+            docker compose up -d uzpolis-admin-ui
+            docker image prune -a -f
