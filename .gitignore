@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.idea/
+
+# Public build-time config (no secrets) is committed on purpose
+!.env.example
+!.env.production
