@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api, getErrorMessage } from '@/lib/api';
-import { PolicyHistoryDto, PolicySummaryDto, PageResult } from '@/lib/types';
+import { usePagedQuery } from '@/lib/usePagedQuery';
+import { PolicyHistoryDto, PolicySummaryDto } from '@/lib/types';
 import { format } from 'date-fns';
 import { RefreshCw, Download, Info, FileText } from 'lucide-react';
 
@@ -44,29 +45,21 @@ function periodLabel(periodId?: number) {
 }
 
 export default function HistoryPoliciesPage() {
-  const [data, setData] = useState<PageResult<PolicyHistoryDto>>({ content: [], totalElements: 0, totalPages: 0, page: 0, size: 20 });
   const [summary, setSummary] = useState<PolicySummaryDto | null>(null);
+  const [summaryVersion, setSummaryVersion] = useState(0);
   const [filters, setFilters] = useState(EMPTY);
   const [search, setSearch] = useState(EMPTY);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, reload } = usePagedQuery<PolicyHistoryDto>('/history/policies', { ...search, page });
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<PolicyHistoryDto | null>(null);
 
-  useEffect(() => { fetchData(); }, [page, search]);
-
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const { data: listRes } = await api.get<PageResult<PolicyHistoryDto>>('/history/policies', { params: { ...search, page, size: 20 } });
-      setData(listRes);
-    } catch { } finally { setLoading(false); }
-
+  useEffect(() => {
     // Summary alohida — u xato bersa ham asosiy ro'yxat ko'rinishda qoladi
     api.get<PolicySummaryDto>('/history/policies/summary', { params: { ...search } })
       .then(r => setSummary(r.data))
       .catch(() => setSummary(null));
-  }
+  }, [search, summaryVersion]);
 
   async function checkPayment(contractId: string) {
     setCheckingId(contractId);
@@ -77,7 +70,8 @@ export default function HistoryPoliciesPage() {
       } else {
         toast.info("To'lov hali amalga oshmagan.");
       }
-      fetchData();
+      reload();
+      setSummaryVersion(v => v + 1);
     } catch (err) { toast.error(getErrorMessage(err)); }
     finally { setCheckingId(null); }
   }
