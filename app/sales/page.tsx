@@ -34,7 +34,7 @@ export default function SalesPage() {
   const [myStats, setMyStats] = useState<SalesStatsDto | null>(null);
   const [allStats, setAllStats] = useState<AdminSalesStatsDto | null>(null);
   const [mySales, setMySales] = useState<SaleDto[]>([]);
-  const [myPage, setMyPage] = useState(0);
+  const [myPage] = useState(0);
   const [myTotal, setMyTotal] = useState(0);
 
   useEffect(() => {

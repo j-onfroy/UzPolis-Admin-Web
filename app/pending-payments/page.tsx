@@ -45,6 +45,7 @@ export default function PendingPaymentsPage() {
     } catch { } finally { setLoading(false); }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { loadSales(); }, [loadSales]);
 
   async function checkPayment(contractId: string) {

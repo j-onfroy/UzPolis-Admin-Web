@@ -28,9 +28,3 @@ export function clearAuth() {
   localStorage.removeItem('admin_user');
   localStorage.removeItem('admin_refresh_token');
 }
-
-export function hasPermission(user: AdminUser | null, permission: string): boolean {
-  if (!user) return false;
-  if (user.role === 'SUPER_ADMIN') return true;
-  return true;
-}

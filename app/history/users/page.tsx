@@ -1,34 +1,22 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import PageHeader from '@/components/PageHeader';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
 import Pagination from '@/components/Pagination';
 import { Badge } from '@/components/ui/badge';
-import { api } from '@/lib/api';
-import { UserHistoryDto, PageResult } from '@/lib/types';
+import { usePagedQuery } from '@/lib/usePagedQuery';
+import { UserHistoryDto } from '@/lib/types';
 import { format } from 'date-fns';
 
 const EMPTY_FILTERS = { phone: '', status: '', from: '', to: '' };
 
 export default function HistoryUsersPage() {
-  const [data, setData] = useState<PageResult<UserHistoryDto>>({ content: [], totalElements: 0, totalPages: 0, page: 0, size: 20 });
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [search, setSearch] = useState(EMPTY_FILTERS);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { fetchData(); }, [page, search]);
-
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const params = { ...search, page, size: 20 };
-      const { data: res } = await api.get<PageResult<UserHistoryDto>>('/history/users', { params });
-      setData(res);
-    } catch { } finally { setLoading(false); }
-  }
+  const { data, loading } = usePagedQuery<UserHistoryDto>('/history/users', { ...search, page });
 
   const columns = [
     { key: 'id', label: 'ID', render: (r: UserHistoryDto) => <span className="font-mono text-xs text-muted-foreground">#{r.id}</span> },

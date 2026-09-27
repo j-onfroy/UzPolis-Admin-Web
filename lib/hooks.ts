@@ -15,6 +15,7 @@ export function useAuth() {
     if (!token || !u) {
       router.replace('/login');
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
       setUser(u);
     }
     setLoading(false);

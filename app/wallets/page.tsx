@@ -147,7 +147,7 @@ export default function WalletsPage() {
             <Card className="mb-6 border-dashed">
               <CardContent className="p-8 text-center">
                 <Wallet size={40} className="text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground mb-4">Sizda hali hamyon yo'q. Sug'urta sotish uchun hamyon yarating.</p>
+                <p className="text-muted-foreground mb-4">Sizda hali hamyon yo&apos;q. Sug&apos;urta sotish uchun hamyon yarating.</p>
                 <Button onClick={handleCreateWallet} disabled={creating} className="gap-2">
                   <Plus size={16} />
                   {creating ? 'Yaratilmoqda...' : 'Hamyon yaratish'}
