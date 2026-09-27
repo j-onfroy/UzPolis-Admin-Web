@@ -1,32 +1,21 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import PageHeader from '@/components/PageHeader';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
 import Pagination from '@/components/Pagination';
-import { api } from '@/lib/api';
-import { CalculationHistoryDto, PageResult } from '@/lib/types';
+import { usePagedQuery } from '@/lib/usePagedQuery';
+import { CalculationHistoryDto } from '@/lib/types';
 import { format } from 'date-fns';
 
 const EMPTY = { gosNumber: '', from: '', to: '' };
 
 export default function HistoryCalculationsPage() {
-  const [data, setData] = useState<PageResult<CalculationHistoryDto>>({ content: [], totalElements: 0, totalPages: 0, page: 0, size: 20 });
   const [filters, setFilters] = useState(EMPTY);
   const [search, setSearch] = useState(EMPTY);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { fetchData(); }, [page, search]);
-
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const { data: res } = await api.get<PageResult<CalculationHistoryDto>>('/history/calculations', { params: { ...search, page, size: 20 } });
-      setData(res);
-    } catch { } finally { setLoading(false); }
-  }
+  const { data, loading } = usePagedQuery<CalculationHistoryDto>('/history/calculations', { ...search, page });
 
   const columns = [
     { key: 'id', label: 'ID', render: (r: CalculationHistoryDto) => <span className="font-mono text-xs text-muted-foreground">#{r.id}</span> },
