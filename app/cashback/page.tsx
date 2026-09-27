@@ -142,7 +142,7 @@ export default function CashbackPage() {
         action={
           <Button onClick={openCreate} size="sm" className="gap-2">
             <Plus size={16} />
-            Qo'shish
+            Qo&apos;shish
           </Button>
         }
       />

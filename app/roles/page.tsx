@@ -37,6 +37,70 @@ function groupByModule(perms: PermissionDto[]) {
   return map;
 }
 
+function PermissionMatrix({
+  permsByModule,
+  selected,
+  onChange,
+}: {
+  permsByModule: Record<string, PermissionDto[]>;
+  selected: Set<number>;
+  onChange: (s: Set<number>) => void;
+}) {
+  return (
+    <div className="space-y-4 mt-3">
+      {Object.entries(permsByModule).map(([module, perms]) => {
+        const allSelected = perms.every(p => selected.has(p.id));
+        const someSelected = perms.some(p => selected.has(p.id));
+        return (
+          <div key={module} className="border rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/40">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = new Set(selected);
+                  if (allSelected) perms.forEach(p => next.delete(p.id));
+                  else perms.forEach(p => next.add(p.id));
+                  onChange(next);
+                }}
+                className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                  allSelected ? 'bg-primary border-primary' : someSelected ? 'bg-primary/40 border-primary/60' : 'border-border'
+                }`}
+              >
+                {(allSelected || someSelected) && <Check size={10} className="text-white" />}
+              </button>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{module}</span>
+            </div>
+            <div className="divide-y">
+              {perms.map(p => (
+                <label key={p.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/20">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.id)}
+                    onChange={e => {
+                      const next = new Set(selected);
+                      if (e.target.checked) next.add(p.id);
+                      else next.delete(p.id);
+                      onChange(next);
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-muted-foreground">{p.code}</span>
+                      <Badge variant="outline" className="text-xs px-1 py-0">{p.action}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{p.description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function RolesPage() {
   const [roles, setRoles] = useState<RoleDto[]>([]);
   const [allPerms, setAllPerms] = useState<PermissionDto[]>([]);
@@ -65,6 +129,7 @@ export default function RolesPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { load(); }, []);
 
   function startEdit(role: RoleDto) {
@@ -133,62 +198,6 @@ export default function RolesPage() {
 
   const permsByModule = groupByModule(allPerms);
 
-  function PermissionMatrix({ selected, onChange }: { selected: Set<number>; onChange: (s: Set<number>) => void }) {
-    return (
-      <div className="space-y-4 mt-3">
-        {Object.entries(permsByModule).map(([module, perms]) => {
-          const allSelected = perms.every(p => selected.has(p.id));
-          const someSelected = perms.some(p => selected.has(p.id));
-          return (
-            <div key={module} className="border rounded-lg overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/40">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = new Set(selected);
-                    if (allSelected) perms.forEach(p => next.delete(p.id));
-                    else perms.forEach(p => next.add(p.id));
-                    onChange(next);
-                  }}
-                  className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                    allSelected ? 'bg-primary border-primary' : someSelected ? 'bg-primary/40 border-primary/60' : 'border-border'
-                  }`}
-                >
-                  {(allSelected || someSelected) && <Check size={10} className="text-white" />}
-                </button>
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{module}</span>
-              </div>
-              <div className="divide-y">
-                {perms.map(p => (
-                  <label key={p.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/20">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(p.id)}
-                      onChange={e => {
-                        const next = new Set(selected);
-                        if (e.target.checked) next.add(p.id);
-                        else next.delete(p.id);
-                        onChange(next);
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-muted-foreground">{p.code}</span>
-                        <Badge variant="outline" className="text-xs px-1 py-0">{p.action}</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{p.description}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
     <DashboardLayout>
       <PageHeader
@@ -233,7 +242,7 @@ export default function RolesPage() {
               </div>
               <div>
                 <Label>Ruxsatlar</Label>
-                <PermissionMatrix selected={newRolePerms} onChange={setNewRolePerms} />
+                <PermissionMatrix permsByModule={permsByModule} selected={newRolePerms} onChange={setNewRolePerms} />
               </div>
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => { setShowCreate(false); setNewRolePerms(new Set()); }}>
@@ -312,7 +321,7 @@ export default function RolesPage() {
                         <p className="text-xs text-muted-foreground mt-3 mb-1">
                           {role.name === 'SUPER_ADMIN' ? 'SUPER_ADMIN ruxsatlarini o\'zgartirish mumkin emas' : 'Ruxsatlarni belgilang:'}
                         </p>
-                        <PermissionMatrix selected={editPerms} onChange={setEditPerms} />
+                        <PermissionMatrix permsByModule={permsByModule} selected={editPerms} onChange={setEditPerms} />
                       </>
                     ) : (
                       <div className="mt-3">
